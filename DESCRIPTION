@@ -7,9 +7,10 @@ Authors@R:
            role = c("aut", "cre"),
            email = "jochenweile@gmail.com",
            comment = c(ORCID = "0000-0003-1628-9390"))
-Description: Calculate pathogenicity LLRs for MAVE datasets
+Description: Calculate pathogenicity LLRs for MAVE datasets.
 License: GPL-3 + file LICENSE.md
 Encoding: UTF-8
-LazyData: true
 Imports: kdensity
 RoxygenNote: 7.0.2
+BuildVignettes: false
+
