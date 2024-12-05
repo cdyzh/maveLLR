@@ -10,7 +10,7 @@ Authors@R:
 Description: Calculate pathogenicity LLRs for MAVE datasets.
 License: GPL-3 + file LICENSE.md
 Encoding: UTF-8
+LazyData: true
 Imports: kdensity
 RoxygenNote: 7.0.2
-BuildVignettes: false
 
