@@ -2,4 +2,7 @@
 
 export(buildLLR.gauss)
 export(buildLLR.kernel)
+export(buildLLR.kernelExperimental)
 export(drawDensityLLR)
+export(drawDensityLLR_fixedRange)
+export(findLLRcrossings)

@@ -65,7 +65,7 @@ buildLLR.kernel <- function(posScores, negScores, bw=0.1, kernel="gaussian", out
 #' @param bw the bandwith to use for kernel density estimation (see kdensity package for more info).
 #'   This can either be a numerical value or the name of the algorithm used to automatically choose one.
 #' @param kernel the type of kernel to use (see kdensity package for more info)
-#' @param 
+#' 
 #'
 #' @return a list containing the LLR function in log10 scale and the positive and negative density functions
 #' @export
@@ -247,6 +247,152 @@ llrThresholds <- function(LLRpvst=optiLLR(0.1),X=2) {
   )
 }
 
+#' Like drawDensityLLR, but with fixed y range for better comparison across different LLRs
+#'
+#' @param scores the numerical scores in the Mave map
+#' @param llrFun the LLR function
+#' @param posDens the density function of the positive reference set
+#' @param negDens the density function of the negative reference set
+#' @param posScores the numerical scores in the postive reference set
+#' @param negScores the numerical scores in the negative reference set
+#'
+#' @return nothing
+#' @export
+#'
+#' @examples
+#' posScores <- rnorm(50,0.2,0.3)
+#' negScores <- rnorm(30,0.8,0.2)
+#' llr <- buildLLR.gauss(posScores,negScores)
+#' drawDensityLLR_fixedRange(c(posScores,negScores),llr$llr,llr$posDens,llr$negDens,posScores,negScores)
+#'
+drawDensityLLR_fixedRange <- function(scores, llrFun, posDens, negDens, posScores, negScores, prior=0.1) {
+  
+  llrTs <- llrThresholds(optiLLR(prior))
+  
+  opar <- par(mfrow=c(2,1))
+  xlim <- range(scores,na.rm=TRUE,finite=TRUE)
+  ymax <- max(c(
+    posDens(seq(xlim[[1]],xlim[[2]],length.out = 100)),
+    negDens(seq(xlim[[1]],xlim[[2]],length.out = 100))
+  ))
+  par(mar=c(.1,4,1,1))
+  xs <- seq(xlim[[1]],xlim[[2]],length.out=200)
+  ys <- llrFun(xs)
+  #ylim <- range(ys,na.rm=TRUE,finite=TRUE)
+  ylim <- c(-3,4) # fixed range
+  plot(NA,type="n",xlim=xlim,ylim=ylim,
+       axes=FALSE,xlab="",ylab="LLR"
+  )
+  drawThresh <- function(t,col,label) {
+    if (t >= 0) {
+      if (t < ylim[[2]]) {
+        rect(xlim[[1]],t,xlim[[2]],ylim[[2]],col=col,border=NA)
+        text(.1*xlim[[2]]+.9*xlim[[1]],t,label,pos=3,cex=0.8)
+      }
+    } else {
+      if (t > ylim[[1]]) {
+        rect(xlim[[1]],ylim[[1]],xlim[[2]],t,col=col,border=NA)
+        text(.1*xlim[[2]]+.9*xlim[[1]],t,label,pos=1,cex=0.8)
+      }
+    }
+  }
+  drawThresh(llrTs[["patho.support"]],"lemonchiffon","Patho. support.")
+  drawThresh(llrTs[["patho.moderate"]],"lightgoldenrod1","Patho. moderate")
+  drawThresh(llrTs[["patho.strong"]],"goldenrod1","Patho. strong")
+  drawThresh(llrTs[["patho.vstrong"]],"indianred1","Patho. very str.")
+  drawThresh(llrTs[["benign.support"]],"lemonchiffon","Benign support.")
+  drawThresh(llrTs[["benign.strong"]],"goldenrod1","Benign strong")
+  
+  lines(xs,ys)
+  # plot(llrFun,from=xlim[[1]],to=xlim[[2]],xlim=xlim,axes=FALSE,xlab="",ylab="LLR")
+  abline(h=0,col="gray",lty="dashed")
+  axis(2)
+  par(mar=c(5,4,.1,1))
+  hist(scores,col="gray90",border=NA,freq=FALSE,main="",xlim=xlim,ylim=c(0,ymax),breaks=50)
+  plot.function(posDens,from=xlim[[1]],to=xlim[[2]],add=TRUE,col="firebrick3",lwd=2)
+  plot.function(negDens,from=xlim[[1]],to=xlim[[2]],add=TRUE,col="darkolivegreen3",lwd=2)
+  abline(v=posScores,col="firebrick3")
+  abline(v=negScores,col="darkolivegreen3")
+  par(opar)
+  
+  return(invisible(NULL))
+}
+
+#' Find x-values at which the given LLR function crosses specified thresholds.
+#'
+#' @param llrFun the LLR Function
+#' @param thresholds thresholds for each ACMG category
+#' @param xlim range of x values i.e. scores
+#' @param nPoints an integer specifying number of points to sample across xlim
+#'
+#' @return a table with threshold labels, values, and x when crossing
+#' @export
+#'
+#' @examples
+#' # Using a previously defined LLR function
+#' posScores <- rnorm(50,0.2,0.3)
+#' negScores <- rnorm(30,0.8,0.2)
+#' llrList <- buildLLR.kernel(posScores, negScores, bw=0.1, kernel="gaussian")
+#' llrFun <- llrList$llr
+#'
+#' # Define thresholds of interest
+#' llrTs <- llrThresholds(optiLLR(0.1))
+#'
+#' # Find the crossings in the range of observed scores
+#' x_range <- range(c(posScores, negScores))
+#' findLLRcrossings(llrFun, llrTs, xlim = x_range)
+findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints=1000) { # walktag
+  
+  # create sequence of x values to sample, with n samples
+  xs <- seq(xlim[1], xlim[2], length.out = nPoints)
+  ys <- llrFun(xs)
+  
+  # helper function to find crossings for a single threshold
+  find_single_threshold_crossings <- function(threshold) {
+    # use llrFun(x) - threshold, identify sign changes
+    fvals <- ys - threshold
+    sign_changes <- which(fvals[-length(fvals)] * fvals[-1] < 0)
+    
+    # find exact crossing
+    crossings <- c()
+    for (idx in sign_changes) {
+      interval <- c(xs[idx], xs[idx+1])
+      # if either endpoint is NA or Inf, skip
+      if (!is.finite(fvals[idx]) || !is.finite(fvals[idx+1])) next
+      
+      res <- tryCatch({
+        # find point in function where it crosses 0 in a certain interval
+        uniroot(function(z) llrFun(z) - threshold, interval=interval)
+      }, error=function(e) NULL)
+      
+      if (!is.null(res)) {
+        crossings <- c(crossings, res$root)
+      }
+    }
+    return(crossings)
+  }
+  
+  thresholdNames <- names(thresholds) # use patho.vstrong, patho.strong, etc.
+  
+  all_results <- lapply(seq_along(thresholds), function(i) {
+    thr <- thresholds[i]
+    thr_label <- thresholdNames[i]
+    cr <- find_single_threshold_crossings(thr)
+    if (length(cr) == 0) {
+      cr <- NA
+    }
+    data.frame(
+      threshold_label = thr_label,
+      threshold_value = thr,
+      score_crossing = cr,
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  result_df <- do.call(rbind, all_results)
+  
+  return(result_df)
+}
 
 #
 # mthfr <- read.csv("~/projects/mthfr/folate_response_model5.csv")
