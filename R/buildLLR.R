@@ -1,4 +1,5 @@
 # Copyright (C) 2020  Jochen Weile, Roth Lab
+# Edited by Cindy Zhang, Roth Lab (2024)
 #
 # This file is part of maveLLR
 #

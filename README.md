@@ -3,7 +3,7 @@ Calculate pathogenicity log likelihood ratios (LLRs) for MAVE datasets
 
 ## Installation
 ```R
-devtools::install_github("jweile/maveLLR")
+devtools::install_github("cdyzh/maveLLR")
 ```
 ## Example usage
 
