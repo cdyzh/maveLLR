@@ -344,7 +344,7 @@ drawDensityLLR_fixedRange <- function(scores, llrFun, posDens, negDens, posScore
 #' # Find the crossings in the range of observed scores
 #' x_range <- range(c(posScores, negScores))
 #' findLLRcrossings(llrFun, llrTs, xlim = x_range)
-findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints=1000) { # walktag
+findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints=1000) {
   
   # create sequence of x values to sample, with n samples
   xs <- seq(xlim[1], xlim[2], length.out = nPoints)
