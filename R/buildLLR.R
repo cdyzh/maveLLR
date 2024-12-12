@@ -233,10 +233,12 @@ drawDensityLLR <- function(scores, llrFun, posDens, negDens, posScores, negScore
   return(invisible(NULL))
 }
 
+#' @export
 optiLLR <- function(prior=0.1,posterior=0.9) {
   log10(posterior*(1-prior)/(prior*(1-posterior)))*4/3
 }
 
+#' @export
 llrThresholds <- function(LLRpvst=optiLLR(0.1),X=2) {
   c(
     patho.vstrong=LLRpvst,
