@@ -299,12 +299,12 @@ drawDensityLLR_fixedRange <- function(scores, llrFun, posDens, negDens, posScore
       }
     }
   }
-  drawThresh(llrTs[["patho.support"]],"lemonchiffon","Patho. support.")
-  drawThresh(llrTs[["patho.moderate"]],"lightgoldenrod1","Patho. moderate")
-  drawThresh(llrTs[["patho.strong"]],"goldenrod1","Patho. strong")
-  drawThresh(llrTs[["patho.vstrong"]],"indianred1","Patho. very str.")
-  drawThresh(llrTs[["benign.support"]],"lemonchiffon","Benign support.")
-  drawThresh(llrTs[["benign.strong"]],"goldenrod1","Benign strong")
+  drawThresh(llrTs[["patho.support"]],"#FFC0CB","Patho. support.")
+  drawThresh(llrTs[["patho.moderate"]],"#FF9999","Patho. moderate")
+  drawThresh(llrTs[["patho.strong"]],"#FF6666","Patho. strong")
+  drawThresh(llrTs[["patho.vstrong"]],"red","Patho. very str.")
+  drawThresh(llrTs[["benign.support"]],"lightblue","Benign support.")
+  drawThresh(llrTs[["benign.strong"]],"dodgerblue","Benign strong")
   
   lines(xs,ys)
   # plot(llrFun,from=xlim[[1]],to=xlim[[2]],xlim=xlim,axes=FALSE,xlab="",ylab="LLR")
@@ -313,9 +313,9 @@ drawDensityLLR_fixedRange <- function(scores, llrFun, posDens, negDens, posScore
   par(mar=c(5,4,.1,1))
   hist(scores,col="gray90",border=NA,freq=FALSE,main="",xlim=xlim,ylim=c(0,ymax),breaks=50)
   plot.function(posDens,from=xlim[[1]],to=xlim[[2]],add=TRUE,col="firebrick3",lwd=2)
-  plot.function(negDens,from=xlim[[1]],to=xlim[[2]],add=TRUE,col="darkolivegreen3",lwd=2)
+  plot.function(negDens,from=xlim[[1]],to=xlim[[2]],add=TRUE,col="deepskyblue2",lwd=2)
   abline(v=posScores,col="firebrick3")
-  abline(v=negScores,col="darkolivegreen3")
+  abline(v=negScores,col="deepskyblue2")
   par(opar)
   
   return(invisible(NULL))
@@ -385,8 +385,8 @@ findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints=1000) {
       cr <- NA
     }
     data.frame(
-      threshold_label = thr_label,
-      threshold_value = thr,
+      LLR_category = thr_label,
+      LLR_threshold = thr,
       score_crossing = cr,
       stringsAsFactors = FALSE
     )
