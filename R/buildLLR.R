@@ -344,58 +344,168 @@ drawDensityLLR_fixedRange <- function(scores, llrFun, posDens, negDens, posScore
 #' # Find the crossings in the range of observed scores
 #' x_range <- range(c(posScores, negScores))
 #' findLLRcrossings(llrFun, llrTs, xlim = x_range)
-findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints=1000) {
-  
-  # create sequence of x values to sample, with n samples
+findLLRcrossings <- function(llrFun, thresholds, xlim, nPoints = 1000) {
   xs <- seq(xlim[1], xlim[2], length.out = nPoints)
   ys <- llrFun(xs)
   
-  # helper function to find crossings for a single threshold
-  find_single_threshold_crossings <- function(threshold) {
-    # use llrFun(x) - threshold, identify sign changes
-    fvals <- ys - threshold
-    sign_changes <- which(fvals[-length(fvals)] * fvals[-1] < 0)
+  # Get indices
+  patho_idx <- which(names(thresholds) == "patho.support")
+  benign_support_idx <- which(names(thresholds) == "benign.support")
+  benign_strong_val <- thresholds[which(names(thresholds) == "benign.strong")]
+  
+  # Insert 'none' as category between patho.support and benign.support
+  benign_support_val <- thresholds[benign_support_idx]
+  thresholds <- append(
+    thresholds,
+    setNames(benign_support_val, "none"),
+    after = patho_idx
+  )
+  
+  # Assign the lower value of none as the upper value of benign.support, but without changing display thresholds
+  display_thresholds <- thresholds
+  thresholds[which(names(thresholds) == "benign.support")] <- benign_strong_val
+  display_thresholds["benign.support"] <- thresholds["none"]
+  
+  thresholdNames <- names(thresholds)
+  
+  # Interval range formatting for thresholds
+  format_range <- function(name, i) {
+    if (name == "none") return("[-0.32, 0.32)")
+    val <- display_thresholds[i]
+    if (is.na(val)) return("")
     
-    # find exact crossing
-    crossings <- c()
-    for (idx in sign_changes) {
-      interval <- c(xs[idx], xs[idx+1])
-      # if either endpoint is NA or Inf, skip
-      if (!is.finite(fvals[idx]) || !is.finite(fvals[idx+1])) next
-      
-      res <- tryCatch({
-        # find point in function where it crosses 0 in a certain interval
-        uniroot(function(z) llrFun(z) - threshold, interval=interval)
-      }, error=function(e) NULL)
-      
-      if (!is.null(res)) {
-        crossings <- c(crossings, res$root)
-      }
+    if (grepl("^patho\\.", name)) {
+      upper <- if (i > 1 && !is.na(display_thresholds[i - 1])) display_thresholds[i - 1] else Inf
+      return(sprintf("[%.2f, %s)", val, ifelse(is.infinite(upper), "∞", sprintf("%.2f", upper))))
+    } else if (grepl("^benign\\.", name)) {
+      lower <- if (i < length(display_thresholds) && !is.na(display_thresholds[i + 1])) display_thresholds[i + 1] else -Inf
+      bracket <- if (is.infinite(lower)) "(" else "["
+      return(sprintf("%s%s, %.2f)", bracket, ifelse(is.infinite(lower), "-∞", sprintf("%.2f", lower)), val))
     }
-    return(crossings)
+    return("")
   }
   
-  thresholdNames <- names(thresholds) # use patho.vstrong, patho.strong, etc.
+  formatted_thresholds <- setNames(sapply(seq_along(thresholds), function(i) {
+    format_range(names(thresholds)[i], i)
+  }), names(thresholds))
   
-  all_results <- lapply(seq_along(thresholds), function(i) {
+  # Determine crossings and direction of crossing
+  crossings <- list()
+  for (i in seq_along(thresholds)) {
     thr <- thresholds[i]
-    thr_label <- thresholdNames[i]
-    cr <- find_single_threshold_crossings(thr)
-    if (length(cr) == 0) {
-      cr <- NA
+    
+    fvals <- ys - thr
+    sign_changes <- which(fvals[-length(fvals)] * fvals[-1] < 0)
+    
+    for (j in sign_changes) {
+      interval <- c(xs[j], xs[j + 1])
+      if (!is.finite(fvals[j]) || !is.finite(fvals[j + 1])) next
+      
+      root <- tryCatch({
+        uniroot(function(z) llrFun(z) - thr, interval = interval)$root
+      }, error = function(e) NA)
+      
+      if (!is.na(root)) {
+        slope <- ys[j + 1] - ys[j]
+        cur_idx <- i
+        
+        if (slope > 0 && cur_idx + 1 <= length(thresholds)) {
+          to <- thresholdNames[cur_idx]
+          from <- thresholdNames[cur_idx + 1]
+        } else if (slope < 0 && cur_idx + 1 <= length(thresholds)) {
+          from <- thresholdNames[cur_idx]
+          to <- thresholdNames[cur_idx + 1]
+        } else {
+          next
+        }
+        
+        crossings[[length(crossings) + 1]] <- list(
+          from = from,
+          to = to,
+          score = round(root, 2)
+        )
+      }
     }
-    data.frame(
-      LLR_category = thr_label,
-      LLR_threshold = thr,
-      score_crossing = cr,
-      stringsAsFactors = FALSE
+  }
+  
+  # Build crossing data frame
+  crossing_df <- do.call(rbind, lapply(crossings, as.data.frame))
+  crossing_df$score <- as.numeric(as.character(crossing_df$score))
+  
+  # Point at where LLR = 0
+  fvals <- ys
+  zero_crossings <- which(fvals[-length(fvals)] * fvals[-1] < 0)
+  for (j in zero_crossings) {
+    interval <- c(xs[j], xs[j + 1])
+    root <- tryCatch({
+      uniroot(function(z) llrFun(z), interval = interval)$root
+    }, error = function(e) NA)
+    if (!is.na(root)) {
+      crossing_df <- rbind(
+        crossing_df,
+        data.frame(
+          from = "LLR = 0",
+          to = "",
+          score = round(root, 2),
+          stringsAsFactors = FALSE
+        )
+      )
+    }
+  }
+  
+  if (nrow(crossing_df) == 0) return(NULL)  # Return early if no crossings at all
+  
+  crossing_df <- crossing_df[order(crossing_df$score), ]
+  
+  # Initialize output with first 'from' row
+  output <- list()
+  
+  first_from <- crossing_df$from[1]
+  if (!is.na(first_from) && first_from != "LLR = 0") {
+    output[[length(output) + 1]] <- data.frame(
+      LLR_category = first_from,
+      LLR_threshold = formatted_thresholds[[first_from]],
+      score_crossing = ""
     )
-  })
+  }
   
-  result_df <- do.call(rbind, all_results)
+  # Add crossing rows and 'to' category rows
+  for (i in seq_len(nrow(crossing_df))) {
+    from <- crossing_df$from[i]
+    to <- crossing_df$to[i]
+    score <- crossing_df$score[i]
+    
+    if (from == "LLR = 0") {
+      # Insert a blank row before "Crossing 0"
+      #output[[length(output) + 1]] <- data.frame(
+      # LLR_category = "",
+      # LLR_threshold = "",
+      #  score_crossing = ""
+      # )
+      
+      output[[length(output) + 1]] <- data.frame(
+        LLR_category = "LLR = 0",
+        LLR_threshold = 0,
+        score_crossing = score
+      )
+    } else {
+      output[[length(output) + 1]] <- data.frame(
+        LLR_category = "---------------------",
+        LLR_threshold = "---------------------",
+        score_crossing = score
+      )
+      
+      output[[length(output) + 1]] <- data.frame(
+        LLR_category = to,
+        LLR_threshold = formatted_thresholds[[to]],
+        score_crossing = ""
+      )
+    }
+  }
   
-  return(result_df)
+  do.call(rbind, output)
 }
+
 
 #
 # mthfr <- read.csv("~/projects/mthfr/folate_response_model5.csv")
